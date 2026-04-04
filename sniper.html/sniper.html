@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNIPER OS v6.0 - Ultimate</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #0a1029; color: white; margin: 0; padding: 0; }
+        .glass { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(51, 65, 85, 0.5); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const SniperApp = () => {
+            const [tab, setTab] = useState('calc');
+            const [input, setInput] = useState({ sTop: '', sBottom: '', nTop: '', nBottom: '' });
+            const [result, setResult] = useState(null);
+            const [history, setHistory] = useState(() => JSON.parse(localStorage.getItem('sniper_v6_db') || '[]'));
+
+            useEffect(() => { localStorage.setItem('sniper_v6_db', JSON.stringify(history)); }, [history]);
+
+            const cores = useMemo(() => {
+                const d = new Date().getDay();
+                if ([0, 3, 4].includes(d)) return [1, 4, 7];
+                if ([2, 6].includes(d)) return [2, 5, 8];
+                return [3, 6, 9];
+            }, []);
+
+            const calculate = () => {
+                if (!input.sTop || !input.nTop) return alert("กรุณากรอกผลบนทั้งสองรอบก่อนครับ");
+                const f1 = input.sTop.slice(-1); 
+                const f2 = input.nTop.slice(-1);
+                const fb = input.nBottom.slice(-1) || '0';
+                const newRes = {
+                    id: Date.now(),
+                    date: new Date().toLocaleDateString('th-TH'),
+                    cores,
+                    inputs: {...input},
+                    d3: [`${cores[0]}${cores[1]}${cores[2]}`, `${f1}${cores[1]}${cores[0]}`, `${f2}${cores[1]}${cores[2]}`],
+                    d2: [`${cores[0]}${cores[1]}`, `${cores[1]}${cores[2]}`, `${cores[1]}${fb}`]
+                };
+                setResult(newRes);
+            };
+             // สถิติ
+            const getStats = () => {
+                const counts = Array(10).fill(0);
+                history.forEach(h => {
+                    [h.inputs.sTop, h.inputs.sBottom, h.inputs.nTop, h.inputs.nBottom].forEach(v => {
+                        if(v) v.split('').forEach(n => { if(!isNaN(n)) counts[parseInt(n)]++ });
+                    });
+                });
+                const max = Math.max(...counts) || 1;
+                return counts.map((c, i) => ({ num: i, count: c, height: (c / max) * 100 }));
+            };
+
+            // AI
+            const getProAI = () => {
+    const freq = Array(10).fill(0);
+    const trend = Array(10).fill(0);
+    const pairs = {};
+
+    history.forEach((h, idx) => {
+      const weight = history.length - idx;
+
+      const nums = [
+        ...(h.inputs.sTop || '').split(''),
+        ...(h.inputs.nTop || '').split('')
+      ];
+
+      nums.forEach(n => {
+        if (!isNaN(n)) {
+          const num = parseInt(n);
+          freq[num]++;
+          trend[num] += weight;
+        }
+      });
+
+      for (let i = 0; i < nums.length - 1; i++) {
+        const pair = nums[i] + nums[i + 1];
+        pairs[pair] = (pairs[pair] || 0) + 1;
+      }
+    });
+
+    const maxF = Math.max(...freq) || 1;
+    const maxT = Math.max(...trend) || 1;
+
+    const scored = freq.map((f, i) => ({
+      num: i,
+      score: (f / maxF) * 0.5 + (trend[i] / maxT) * 0.5
+    })).sort((a, b) => b.score - a.score);
+
+    return {
+      topNumbers: scored.slice(0, 5),
+      hotPairs: Object.entries(pairs).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    };
+  };
+            // ความแม่น
+            const getAccuracyStats = () => {
+    let hit = 0;
+    let miss = 0;
+
+    for (let i = 0; i < history.length - 1; i++) {
+      const now = history[i];
+      const next = history[i + 1];
+
+      const predict = [...now.d3, ...now.d2];
+      const actual = next.inputs.nTop || '';
+
+      const ok = predict.some(p => actual.includes(p));
+
+      if (ok) hit++;
+      else miss++;
+    }
+
+    const total = hit + miss;
+
+    return {
+      hit,
+      miss,
+      accuracy: total === 0 ? 0 : ((hit / total) * 100).toFixed(1)
+    };
+  };
+
+            return (
+                <div className="max-w-md mx-auto p-4 pb-32 min-h-screen border-x border-slate-900">
+                    <header className="py-10 text-center">
+                        <h1 className="text-4xl font-black italic text-yellow-500 uppercase tracking-tighter">SNIPER OS <span className="text-white text-[10px] not-italic opacity-50">V6.0</span></h1>
+                    </header>
+
+                    {tab === 'calc' && (
+                        <div className="space-y-6">
+                            <div className="glass p-4 rounded-2xl flex justify-between items-center bg-slate-900/50">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ประธานวันนี้</span>
+                                <span className="text-2xl font-black text-yellow-500 tracking-widest">{cores.join(' - ')}</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-yellow-500 font-bold ml-1 opacity-60">SPECIAL (17:30)</label>
+                                    <div className="flex gap-2">
+                                        <input placeholder="บน" className="w-full bg-slate-900 p-4 rounded-xl border border-slate-800 focus:border-yellow-500 outline-none text-center font-bold" value={input.sTop} onChange={e => setInput({...input, sTop: e.target.value})} />
+                                        <input placeholder="ล่าง" className="w-20 bg-slate-900 p-4 rounded-xl border border-slate-800 focus:border-yellow-500 outline-none text-center font-bold" value={input.sBottom} onChange={e => setInput({...input, sBottom: e.target.value})} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-blue-400 font-bold ml-1 opacity-60">NORMAL (18:30)</label>
+                                    <div className="flex gap-2">
+                                        <input placeholder="บน" className="w-full bg-slate-900 p-4 rounded-xl border border-slate-800 focus:border-blue-500 outline-none text-center font-bold" value={input.nTop} onChange={e => setInput({...input, nTop: e.target.value})} />
+                                        <input placeholder="ล่าง" className="w-20 bg-slate-900 p-4 rounded-xl border border-slate-800 focus:border-blue-500 outline-none text-center font-bold" value={input.nBottom} onChange={e => setInput({...input, nBottom: e.target.value})} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onClick={calculate} className="w-full bg-yellow-500 text-black font-black py-5 rounded-2xl active:scale-95 transition-all text-xl uppercase italic shadow-lg shadow-yellow-500/10">คำนวณหมาก VIP</button>
+                            
+                            {result && (
+                                <div className="space-y-3 pt-2">
+                                    <div className="bg-blue-600 p-5 rounded-3xl text-center shadow-xl border-t border-white/20">
+                                        <p className="text-[10px] font-black uppercase mb-2 opacity-70 tracking-widest text-white">สไนเปอร์ 3 ตัวตรง</p>
+                                        <div className="text-4xl font-black flex justify-around drop-shadow-md">
+                                            {result.d3.map((n, i) => <span key={i}>{n}</span>)}
+                                        </div>
+                                    </div>
+                                    <div className="bg-emerald-600 p-5 rounded-3xl text-center shadow-xl border-t border-white/20">
+                                        <p className="text-[10px] font-black uppercase mb-2 opacity-70 tracking-widest text-white">ชุดหมาก 2 ตัว ไป-กลับ</p>
+                                        <div className="text-4xl font-black flex justify-around drop-shadow-md">
+                                            {result.d2.map((n, i) => <span key={i}>{n}</span>)}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => {setHistory([result, ...history]); setResult(null); setInput({sTop:'', sBottom:'', nTop:'', nBottom:''}); alert('บันทึกฐานข้อมูลแล้ว!');}} className="w-full bg-slate-800 py-4 rounded-2xl font-bold border border-slate-700 mt-2">💾 บันทึกสถิติลงเครื่อง</button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {tab === 'analysis' && (() => {
+        const ai = getProAI();
+        const acc = getAccuracyStats();
+
+        return (
+          <div className="space-y-6">
+
+            {/* 📊 กราฟ */}
+            <div className="glass p-6 rounded-3xl h-64 flex items-end gap-1">
+              {getStats().map(s => (
+                <div key={s.num} className="flex-1 flex flex-col items-center">
+                  <div
+                    className="w-full bg-yellow-500"
+                    style={{ height: `${s.height}%`, minHeight: '4px' }}
+                  ></div>
+                  <span className="text-xs">{s.num}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* 🤖 AI */}
+            <div className="glass p-4 rounded-2xl">
+              <p className="text-xs mb-2">AI แนะนำ</p>
+              <div className="flex justify-around text-xl font-bold text-yellow-500">
+                {ai.topNumbers.map(x => <span key={x.num}>{x.num}</span>)}
+              </div>
+            </div>
+
+            {/* 🔥 คู่เลข */}
+            <div className="glass p-4 rounded-2xl">
+              <p className="text-xs mb-2">คู่เลขเด่น</p>
+              <div className="flex flex-wrap gap-2">
+                {ai.hotPairs.map(([p]) => (
+                  <span key={p}>{p}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* 🎯 ความแม่น */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div><p>เข้า</p><p>{acc.hit}</p></div>
+              <div><p>พลาด</p><p>{acc.miss}</p></div>
+              <div><p>%</p><p>{acc.accuracy}</p></div>
+            </div>
+
+          </div>
+        );
+      })()}
+      {tab === 'hist' && (
+  <div className="space-y-3">
+    <div className="flex justify-between items-center mb-2">
+      <h2 className="text-xl font-black text-yellow-500 italic uppercase">History Log</h2>
+      <button onClick={() => {if(confirm('ลบทั้งหมด?')) setHistory([])}} className="text-[10px] text-red-500 border border-red-500/30 px-2 py-1 rounded">CLEAR ALL</button>
+    </div>
+
+    {history.map(h => (
+      <div key={h.id} className="glass p-4 rounded-2xl flex justify-between items-center border-l-4 border-l-yellow-500 bg-slate-900/40">
+        <div>
+          <p className="text-[10px] text-slate-500 font-bold mb-1">{h.date}</p>
+          <p className="text-xl font-black">
+            {h.d3[0]} <span className="text-yellow-500 mx-1">|</span> {h.d2[0]}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[8px] text-slate-500 uppercase font-bold">ประธาน</p>
+          <p className="text-xs font-black text-slate-400">{h.cores.join('')}</p>
+        </div>
+        
+      </div>
+    ))}
+    
+  </div>
+)}
+<nav className="fixed bottom-6 left-4 right-4 bg-slate-900/90 border border-slate-700 rounded-full p-2 flex justify-around shadow-2xl backdrop-blur-lg">
+  <button 
+    onClick={() => setTab('calc')} 
+    className={`px-5 py-2 rounded-full text-[10px] font-black transition-all ${
+      tab === 'calc' ? 'bg-yellow-500 text-black' : 'text-slate-500'
+    }`}
+  >
+    TARGET
+  </button>
+
+  <button 
+    onClick={() => setTab('analysis')} 
+    className={`px-5 py-2 rounded-full text-[10px] font-black transition-all ${
+      tab === 'analysis' ? 'bg-yellow-500 text-black' : 'text-slate-500'
+    }`}
+  >
+    STATS
+  </button>
+
+  <button 
+    onClick={() => setTab('hist')} 
+    className={`px-5 py-2 rounded-full text-[10px] font-black transition-all ${
+      tab === 'hist' ? 'bg-yellow-500 text-black' : 'text-slate-500'
+    }`}
+  >
+    HISTORY
+  </button>
+</nav>
+    </div>
+  );
+};
+
+
+ // 🔥 ปิดฟังก์ชัน + render
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<SniperApp />);
+    </script>
+</body>
+</html>
